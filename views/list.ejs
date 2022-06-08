@@ -7,14 +7,15 @@
     </div>
 
     <div class="box">
-        <% for(var i=0; i<newListItem.length; i++) {%>
+        <% newListItem.forEach((item)=>{  %>
             <div class="item">
                 <input type="checkbox">
                 <p>
-                    <%= newListItem[i] %>
+                    <%= item.name %>
                 </p>
             </div>
-            <% } %>
+      <%  }) %>
+      
             <form action="/" method="post" class="item">
                 <input type="text" name="newItem" placeholder="New Item">
                 <button type="submit" name="list" value=<%= listTittle %>>+</button>
