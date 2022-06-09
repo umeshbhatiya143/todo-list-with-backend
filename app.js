@@ -2,10 +2,11 @@ const express = require("express")
 const bodyParser = require("body-parser");
 const date = require(__dirname + "/date.js");
 const mongoose = require("mongoose");
+const _ = require("lodash");
 //const ejs = require("ejs")
 
 //var items = ["Buy food", "cook food", "eat food"];
-var workItems = [];
+var items = [];
 
 const app = express();
 
@@ -36,20 +37,13 @@ const item3 = new Item({
 });
 const defaultItems = [item1, item2, item3];
 
+//create new schema for dynamic routes
+const listSchema = {
+    name: String,
+    items: [itemSchema]
+};
 
-
-// Item.deleteOne({_id:"62a10ccffaff1805d2045f7f"}, (err)=>{
-//     if(err){
-//         console.log(err);
-//     }
-//     else{
-//         console.log("deleted!");
-//     }
-// });
-
-
-
-
+const List = mongoose.model("List",listSchema);
 
 
 app.get('/', (req, res) => {
@@ -77,8 +71,33 @@ app.get('/', (req, res) => {
 
 });
 
+//create a dynamic route for such cases localhost:3000/work
+app.get("/:customListName",(req,res)=>{
+    const customListName = _.capitalize(req.params.customListName);
+   
+    List.findOne({name: customListName}, (err, foundList)=>{
+        if(!err){
+            if(!foundList){
+                //Create a new list
+                const list = new List({
+                    name: customListName,
+                    items: defaultItems
+                });
+                list.save();
+                res.redirect("/" + customListName);
+            }
+            else{
+                //show an existing list
+                res.render("list", { listTittle: foundList.name, newListItem: foundList.items});
+            }
+        }
+    });
+});
+
+
 app.post("/", (req, res) => {
     var todo = req.body.newItem;
+    const listName = req.body.list;
     //we can not use res.render more than once so to send back the data to the browser
     //we render all the data only once and then use 'res.redirect()' where the variable define.
     // if (req.body.list === "Work") {
@@ -94,15 +113,41 @@ app.post("/", (req, res) => {
     const item = new Item({
          name: todo
     });
-    item.save();
-    res.redirect('/');
+    if(listName === "Today"){
+        item.save();
+        res.redirect("/");
+    }
+    else{
+        List.findOne({name: listName}, (err, foundList)=>{
+          foundList.items.push(item);
+          foundList.save();
+          res.redirect("/" + listName);
+        });
+    }
+});
+//to delete the marked todo
+app.post("/delete",(req,res)=>{
+    const checkboxItemId = req.body.checkbox;
+    const listName = req.body.listName;
 
+    if(listName === "Today"){
+        Item.deleteOne({_id:checkboxItemId}, (err)=>{
+            if(!err){
+                console.log("Successfully deleted checked item.");
+                res.redirect("/");
+            }
+        });
+    }
+    else{
+        List.findOneAndUpdate({name:listName}, {$pull: {items: {_id: checkboxItemId}}}, (err, foundList)=>{
+             if(!err){
+                 res.redirect("/" + listName);
+             }
+        });
+    }
 });
 
-//a new page find as 'localhost:3000/work'
-app.get('/work', (req, res) => {
-    res.render("list", { listTittle: "Work List", newListItem: workItems });
-});
+
 
 app.get("/about", (req, res) => {
     res.render("about");
